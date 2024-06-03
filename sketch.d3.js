@@ -49,7 +49,7 @@ function setup() {
 }
 
 function draw() {
-  background(255, 100, 50); // Background color similar to your image
+  background(0); // Background color similar to your image
   fill(255);
   stroke(0, 0, 0, 0);
 
