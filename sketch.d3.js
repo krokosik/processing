@@ -1,18 +1,20 @@
 // Global physical parameters
 const numOrbs = 5;
 const links = [
-  //   [0, 1],
-  //   [1, 2],
-  //   [2, 3],
-  //   [3, 4],
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
 ].map((link) => ({ source: link[0], target: link[1] }));
 let gravityCenter; // Dynamic center based on window size
 const chargeStrength = 80;
 const linkDistance = 100;
-const collisionRadius = 30;
+const nodeRadius = 30;
+const collisionRadius = 50;
 
 let orbs = [];
 let simulation;
+let draggedOrb;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -47,11 +49,11 @@ function setup() {
 function draw() {
   background(255, 100, 50); // Background color similar to your image
   fill(255);
-  stroke(0);
+  stroke(0, 0, 0, 0);
 
   // Draw orbs based on D3's force simulation calculations
   for (let orb of orbs) {
-    ellipse(orb.x, orb.y, 2 * collisionRadius);
+    ellipse(orb.x, orb.y, 2 * nodeRadius);
   }
 }
 
@@ -59,23 +61,30 @@ function ticked() {
   // D3 handles physics calculations and updates positions
 }
 
-function mouseDragged() {
-  // Allow the user to interact by dragging orbs
+function mousePressed() {
+  // Check if the mouse is over an orb
   orbs.forEach((orb) => {
     let d = dist(mouseX, mouseY, orb.x, orb.y);
     if (d < collisionRadius) {
-      orb.fx = mouseX;
-      orb.fy = mouseY;
+      draggedOrb = orb;
+      return;
     }
   });
 }
 
+function mouseDragged() {
+  // Allow the user to interact by dragging orbs
+  if (draggedOrb) {
+    draggedOrb.fx = mouseX;
+    draggedOrb.fy = mouseY;
+  }
+}
+
 function mouseReleased() {
+  draggedOrb.fx = null; // Stop fixing the orb's position
+  draggedOrb.fy = null;
   // When the mouse is released, orbs should stop being fixed
-  orbs.forEach((orb) => {
-    orb.fx = null;
-    orb.fy = null;
-  });
+  simulation.alpha(0.3).restart(); // Reheat the simulation
 }
 
 function windowResized() {
