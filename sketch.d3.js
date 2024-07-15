@@ -1,3 +1,6 @@
+/// <reference path="node_modules/@types/d3/index.d.ts"/>
+/// <reference path="node_modules/@types/p5/index.d.ts"/>
+
 // Global physical parameters
 const numOrbs = 5;
 const links = [
@@ -16,7 +19,8 @@ const GAS_DENSITY = 0.0005; // particles per sq px
 const NUM_DIFFUSERS = 5;
 const DIFFUSER_RADIUS = 50;
 const STROKE_WEIGHT = 5;
-let TEMP = 10;
+const TEMP = 10;
+const MAX_LINK_SPREAD = PI / 4;
 let numDustParticales;
 
 let orbs = [];
@@ -30,8 +34,8 @@ function setup() {
   // Initialize orbs
   for (let i = 0; i < numOrbs; i++) {
     orbs.push({
-      x: random(width),
-      y: random(height),
+      x: random(NODE_RADIUS, width - NODE_RADIUS),
+      y: random(NODE_RADIUS, height - NODE_RADIUS),
       vx: 0,
       vy: 0,
       r: NODE_RADIUS,
@@ -42,8 +46,8 @@ function setup() {
   numDustParticales = GAS_DENSITY * width * height;
   for (let i = 0; i < numDustParticales; i++) {
     orbs.push({
-      x: random(width),
-      y: random(height),
+      x: random(GAS_RADIUS, width - GAS_RADIUS),
+      y: random(GAS_RADIUS, height - GAS_RADIUS),
       vx: randomVelocity(TEMP),
       vy: randomVelocity(TEMP),
       r: GAS_RADIUS,
@@ -101,8 +105,11 @@ function draw() {
     }
   }
   for (let link of links) {
-    let source = orbs[link.source];
-    let target = orbs[link.target];
+    const source = createVector(orbs[link.source].x, orbs[link.source].y);
+    const target = createVector(orbs[link.target].x, orbs[link.target].y);
+
+    const angleBetween = source.angleBetween(target);
+
     line(source.x, source.y, target.x, target.y);
   }
 }
