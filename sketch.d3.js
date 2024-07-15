@@ -20,7 +20,9 @@ const NUM_DIFFUSERS = 5;
 const DIFFUSER_RADIUS = 50;
 const STROKE_WEIGHT = 5;
 const TEMP = 10;
-const MAX_LINK_SPREAD = PI / 4;
+const MAX_LINK_SPREAD = Math.PI / 2;
+const SPREAD_SCALING_FACTOR = 0.5;
+const HANDLE_SIZE = 2.45;
 let numDustParticales;
 
 let orbs = [];
@@ -96,7 +98,7 @@ function draw() {
   background(0);
   fill(255);
   stroke(255);
-  strokeWeight(STROKE_WEIGHT);
+  // strokeWeight(STROKE_WEIGHT);
 
   // Draw orbs based on D3's force simulation calculations
   for (let orb of orbs) {
@@ -107,10 +109,42 @@ function draw() {
   for (let link of links) {
     const source = createVector(orbs[link.source].x, orbs[link.source].y);
     const target = createVector(orbs[link.target].x, orbs[link.target].y);
+    const d = p5.Vector.dist(source, target);
 
-    const angleBetween = source.angleBetween(target);
+    const angleBetween = Math.atan2(target.y - source.y, target.x - source.x);
 
-    line(source.x, source.y, target.x, target.y);
+    const angle1 = angleBetween + MAX_LINK_SPREAD * SPREAD_SCALING_FACTOR;
+    const angle2 = angleBetween - MAX_LINK_SPREAD * SPREAD_SCALING_FACTOR;
+
+    const angle3 =
+      angleBetween + PI - (PI - MAX_LINK_SPREAD) * SPREAD_SCALING_FACTOR;
+    const angle4 =
+      angleBetween - PI + (PI - MAX_LINK_SPREAD) * SPREAD_SCALING_FACTOR;
+
+    const p1 = p5.Vector.add(source, p5.Vector.fromAngle(angle1, NODE_RADIUS));
+    const p2 = p5.Vector.add(source, p5.Vector.fromAngle(angle2, NODE_RADIUS));
+
+    const p3 = p5.Vector.add(target, p5.Vector.fromAngle(angle3, NODE_RADIUS));
+    const p4 = p5.Vector.add(target, p5.Vector.fromAngle(angle4, NODE_RADIUS));
+
+    const d2Base = Math.min(
+      HANDLE_SIZE / 2,
+      (p5.Vector.dist(p1, p3) / 2) * NODE_RADIUS
+    );
+    const d2 = d2Base * Math.min(1, d / NODE_RADIUS);
+    const handle = d2 * NODE_RADIUS;
+
+    const h1 = p5.Vector.add(p1, p5.Vector.fromAngle(angle1 - PI / 2, handle));
+    const h2 = p5.Vector.add(p2, p5.Vector.fromAngle(angle2 + PI / 2, handle));
+    const h3 = p5.Vector.add(p3, p5.Vector.fromAngle(angle3 + PI / 2, handle));
+    const h4 = p5.Vector.add(p4, p5.Vector.fromAngle(angle4 - PI / 2, handle));
+
+    beginShape();
+    vertex(p1.x, p1.y);
+    bezierVertex(h1.x, h1.y, h3.x, h3.y, p3.x, p3.y);
+    vertex(p4.x, p4.y);
+    bezierVertex(h4.x, h4.y, h2.x, h2.y, p2.x, p2.y);
+    endShape();
   }
 }
 
