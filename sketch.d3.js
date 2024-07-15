@@ -15,6 +15,7 @@ const collisionRadius = 50;
 const GAS_DENSITY = 0.0005; // particles per sq px
 const NUM_DIFFUSERS = 5;
 const DIFFUSER_RADIUS = 50;
+const STROKE_WEIGHT = 5;
 let TEMP = 10;
 let numDustParticales;
 
@@ -31,8 +32,8 @@ function setup() {
     orbs.push({
       x: random(width),
       y: random(height),
-      vx: randomVelocity(TEMP),
-      vy: randomVelocity(TEMP),
+      vx: 0,
+      vy: 0,
       r: NODE_RADIUS,
     });
   }
@@ -84,19 +85,25 @@ function setup() {
   // simulation.force("link").links(links);
 
   // Prevent simulation from freezing by continuously reheating
-  // simulation.alphaTarget(0.3).restart();
+  simulation.alphaTarget(0.3).restart();
 }
 
 function draw() {
   background(0);
   fill(255);
-  stroke(0, 0, 0, 0);
+  stroke(255);
+  strokeWeight(STROKE_WEIGHT);
 
   // Draw orbs based on D3's force simulation calculations
   for (let orb of orbs) {
     if (orb.r != GAS_RADIUS) {
       ellipse(orb.x, orb.y, 2 * orb.r);
     }
+  }
+  for (let link of links) {
+    let source = orbs[link.source];
+    let target = orbs[link.target];
+    line(source.x, source.y, target.x, target.y);
   }
 }
 
