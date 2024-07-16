@@ -4,11 +4,11 @@
 // Global physical parameters
 const numOrbs = 5;
 let links = [
-  // [0, 1],
-  // [1, 2],
-  // [2, 3],
-  // [3, 4],
-]; //.map((link) => ({ source: link[0], target: link[1] }));
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+].map((link) => ({ source: link[0], target: link[1] }));
 const CHARGE_STRENGTH = 0.05;
 const LINK_STRENGTH = 0.01;
 let gravityCenter; // Dynamic center based on window size
@@ -30,6 +30,11 @@ let orbs = [];
 let simulation;
 let draggedOrb;
 
+// controls
+let handleSizeSlider;
+let spreadSlider;
+let maxLinkSpreadSlider;
+
 function setup() {
   const dim = Math.min(windowWidth, windowHeight);
   NODE_RADIUS = dim / 4 / 2;
@@ -39,6 +44,18 @@ function setup() {
   DISCONNECT_DISTANCE = 2 * NODE_RADIUS * 2.5;
   createCanvas(dim, dim);
   gravityCenter = { x: width / 2, y: height / 2 }; // Update center based on window size
+
+  createP("Handle Size");
+  handleSizeSlider = createSlider(0, 10, HANDLE_SIZE, 0.1).size(dim / 2);
+  createP("Spread Factor");
+  spreadSlider = createSlider(0, 1, SPREAD_SCALING_FACTOR, 0.01).size(dim / 2);
+  createP("Max Link Spread");
+  maxLinkSpreadSlider = createSlider(
+    0,
+    Math.PI / 2,
+    MAX_LINK_SPREAD,
+    0.01
+  ).size(dim / 2);
 
   // Initialize orbs
   for (let i = 0; i < numOrbs; i++) {
@@ -140,13 +157,19 @@ function drawConnection(source, target) {
 
   const angleBetween = Math.atan2(target.y - source.y, target.x - source.x);
 
-  const angle1 = angleBetween + MAX_LINK_SPREAD * SPREAD_SCALING_FACTOR;
-  const angle2 = angleBetween - MAX_LINK_SPREAD * SPREAD_SCALING_FACTOR;
+  const angle1 =
+    angleBetween + maxLinkSpreadSlider.value() * spreadSlider.value();
+  const angle2 =
+    angleBetween - maxLinkSpreadSlider.value() * spreadSlider.value();
 
   const angle3 =
-    angleBetween + PI - (PI - MAX_LINK_SPREAD) * SPREAD_SCALING_FACTOR;
+    angleBetween +
+    PI -
+    (PI - maxLinkSpreadSlider.value()) * spreadSlider.value();
   const angle4 =
-    angleBetween - PI + (PI - MAX_LINK_SPREAD) * SPREAD_SCALING_FACTOR;
+    angleBetween -
+    PI +
+    (PI - maxLinkSpreadSlider.value()) * spreadSlider.value();
 
   const p1 = p5.Vector.add(source, p5.Vector.fromAngle(angle1, NODE_RADIUS));
   const p2 = p5.Vector.add(source, p5.Vector.fromAngle(angle2, NODE_RADIUS));
@@ -155,7 +178,7 @@ function drawConnection(source, target) {
   const p4 = p5.Vector.add(target, p5.Vector.fromAngle(angle4, NODE_RADIUS));
 
   const d2Base = Math.min(
-    HANDLE_SIZE / 2,
+    handleSizeSlider.value() / 2,
     (p5.Vector.dist(p1, p3) / 2) * NODE_RADIUS
   );
   const d2 = d2Base * Math.min(1, d / NODE_RADIUS);
