@@ -1,23 +1,19 @@
 /// <reference path="node_modules/@types/d3/index.d.ts"/>
 /// <reference path="node_modules/@types/p5/index.d.ts"/>
+/// <reference path="node_modules/@types/dat.gui/index.d.ts"/>
 
 // Global physical parameters
-const numOrbs = 5;
 let links = [
   [0, 1],
   [1, 2],
   [2, 3],
   [3, 4],
 ].map((link) => ({ source: link[0], target: link[1] }));
-const CHARGE_STRENGTH = 0.05;
-const LINK_STRENGTH = 0.01;
-let gravityCenter; // Dynamic center based on window size
+
 let NODE_RADIUS; // dynamic radius based on window size
 let LINK_DISTANCE; // dynamic distance based on node radius
 let GAS_RADIUS;
 const GAS_DENSITY = 0.001; // particles per sq px
-const STROKE_WEIGHT = 5;
-const TEMP = 10;
 const MAX_LINK_SPREAD = Math.PI / 2;
 const SPREAD_SCALING_FACTOR = 0.5;
 const HANDLE_SIZE = 2;
@@ -26,14 +22,74 @@ let CONNECT_DISTANCE;
 let DISCONNECT_DISTANCE;
 let numDustParticales;
 
+let params = {
+  numOrbs: 5,
+  chargeStrength: 0,
+  gasDensity: 0.001,
+  maxLinkSpread: Math.PI / 2,
+  spreadScalingFactor: 0.5,
+  handleSize: 2,
+  temperature: 10,
+  showLinks: true,
+  showNodes: true,
+  showGas: false,
+};
+
+const colors = {
+  background: [0, 0, 0],
+  fill: [255, 255, 255],
+  gas: [255, 0, 0, 0.3],
+};
+
+const gui = new dat.GUI({ name: "NVLV Logo" });
+
 let orbs = [];
 let simulation;
 let draggedOrb;
 
-// controls
-let handleSizeSlider;
-let spreadSlider;
-let maxLinkSpreadSlider;
+function initGui() {
+  const elementsFolder = gui.addFolder("Elements");
+  elementsFolder
+    .add(params, "numOrbs", 1, 5, 1)
+    .name("Orbs")
+    .onChange(() => {
+      reinitNodes();
+    });
+  elementsFolder.add(params, "showNodes").name("Show Nodes");
+  elementsFolder.add(params, "showLinks").name("Show Links");
+  elementsFolder.add(params, "showGas").name("Show Gas");
+  elementsFolder.addColor(colors, "background").name("Background");
+  elementsFolder.addColor(colors, "fill").name("Fill");
+  elementsFolder.addColor(colors, "gas").name("Gas");
+  elementsFolder.close();
+
+  const physicsFolder = gui.addFolder("Physics");
+  physicsFolder
+    .add(params, "chargeStrength", 0, 1, 0.01)
+    .name("Charge Strength (BROKEN)");
+  // .onChange((value) => simulation.force("charge").strength(value));
+  physicsFolder
+    .add(params, "gasDensity", 0.001, 0.01, 0.0001)
+    .name("Gas Density")
+    .onChange(() => {
+      reinitGas();
+    });
+  physicsFolder
+    .add(params, "temperature", 0, 100, 1)
+    .name("Temperature")
+    .onChange(() => {
+      reinitGas();
+    });
+  physicsFolder.close();
+
+  const linksFolder = gui.addFolder("Links");
+  linksFolder
+    .add(params, "maxLinkSpread", 0, Math.PI, 0.01)
+    .name("Max Link Spread");
+  linksFolder.add(params, "spreadScalingFactor", 0, 1, 0.01).name("Spread");
+  linksFolder.add(params, "handleSize", 0, 10, 0.1).name("Handle Size");
+  linksFolder.open();
+}
 
 function setup() {
   const dim = Math.min(windowWidth, windowHeight);
@@ -42,59 +98,26 @@ function setup() {
   LINK_DISTANCE = NODE_RADIUS * 2.5;
   CONNECT_DISTANCE = 2 * NODE_RADIUS * 1.5;
   DISCONNECT_DISTANCE = 2 * NODE_RADIUS * 2.5;
-  createCanvas(dim, dim);
-  gravityCenter = { x: width / 2, y: height / 2 }; // Update center based on window size
-
-  createP("Handle Size");
-  handleSizeSlider = createSlider(0, 10, HANDLE_SIZE, 0.1).size(dim / 2);
-  createP("Spread Factor");
-  spreadSlider = createSlider(0, 1, SPREAD_SCALING_FACTOR, 0.01).size(dim / 2);
-  createP("Max Link Spread");
-  maxLinkSpreadSlider = createSlider(
-    0,
-    Math.PI / 2,
-    MAX_LINK_SPREAD,
-    0.01
-  ).size(dim / 2);
+  createCanvas();
 
   // Initialize orbs
-  for (let i = 0; i < numOrbs; i++) {
-    orbs.push({
-      x: random(NODE_RADIUS * 1.1, width - NODE_RADIUS * 1.1),
-      y: random(NODE_RADIUS * 1.1, height - NODE_RADIUS * 1.1),
-      vx: 0,
-      vy: 0,
-      r: NODE_RADIUS,
-    });
-  }
-
-  // Initialize gas
-  numDustParticales = GAS_DENSITY * width * height;
-  for (let i = 0; i < numDustParticales; i++) {
-    orbs.push({
-      x: random(GAS_RADIUS, width - GAS_RADIUS),
-      y: random(GAS_RADIUS, height - GAS_RADIUS),
-      vx: randomVelocity(TEMP),
-      vy: randomVelocity(TEMP),
-      r: GAS_RADIUS,
-    });
-  }
+  initGui();
+  initOrbs();
 
   // Set up D3 simulation
   simulation = d3
     .forceSimulation(orbs)
-    // .force("center", d3.forceCenter(gravityCenter.x, gravityCenter.y))
     // .force("charge", d3.forceManyBody().strength(CHARGE_STRENGTH))
     .alphaDecay(0)
     .velocityDecay(0)
-    .force(
-      "link",
-      d3
-        .forceLink()
-        .id((d, i) => i)
-        .distance(LINK_DISTANCE)
-        .strength(LINK_STRENGTH)
-    )
+    // .force(
+    //   "link",
+    //   d3
+    //     .forceLink()
+    //     .id((d, i) => i)
+    //     .distance(LINK_DISTANCE)
+    //     .strength(LINK_STRENGTH)
+    // )
     .force(
       "bounce",
       d3.forceBounce().radius((d) => d.r)
@@ -115,25 +138,77 @@ function setup() {
     .on("tick", ticked);
 
   // simulation.force("link").links(links);
+}
 
-  // Prevent simulation from freezing by continuously reheating
-  simulation.alphaTarget(0).restart();
+function initOrbs() {
+  orbs = initNodes().concat(initGas());
+}
+
+function reinitGas() {
+  orbs = orbs.slice(0, params.numOrbs).concat(initGas());
+  simulation.nodes(orbs);
+}
+
+function reinitNodes() {
+  orbs = initNodes().concat(orbs.slice(params.numOrbs));
+  simulation.nodes(orbs);
+}
+
+function initNodes() {
+  const nodes = [];
+
+  for (let i = 0; i < params.numOrbs; i++) {
+    nodes.push({
+      x: random(NODE_RADIUS * 1.1, width - NODE_RADIUS * 1.1),
+      y: random(NODE_RADIUS * 1.1, height - NODE_RADIUS * 1.1),
+      vx: 0,
+      vy: 0,
+      r: NODE_RADIUS,
+    });
+  }
+  return nodes;
+}
+
+function initGas() {
+  const gas = [];
+  numDustParticales = params.gasDensity * width * height;
+  for (let i = 0; i < numDustParticales; i++) {
+    gas.push({
+      x: random(GAS_RADIUS, width - GAS_RADIUS),
+      y: random(GAS_RADIUS, height - GAS_RADIUS),
+      vx: randomVelocity(params.temperature),
+      vy: randomVelocity(params.temperature),
+      r: GAS_RADIUS,
+    });
+  }
+  return gas;
 }
 
 function draw() {
-  background(0);
-  fill(255);
-  stroke(255);
-  // strokeWeight(STROKE_WEIGHT);
+  background(...colors.background);
+  fill(...colors.fill);
+  strokeWeight(0);
 
   // Draw orbs based on D3's force simulation calculations
-  for (let orb of orbs.slice(0, SHOW_GAS ? orbs.length : numOrbs)) {
-    ellipse(orb.x, orb.y, 2 * orb.r);
+  if (params.showNodes) {
+    for (let orb of orbs.slice(0, params.numOrbs)) {
+      ellipse(orb.x, orb.y, 2 * orb.r);
+    }
   }
-  for (let link of links) {
-    const source = createVector(orbs[link.source].x, orbs[link.source].y);
-    const target = createVector(orbs[link.target].x, orbs[link.target].y);
-    drawConnection(source, target);
+
+  if (params.showLinks) {
+    for (let link of links) {
+      const source = createVector(orbs[link.source].x, orbs[link.source].y);
+      const target = createVector(orbs[link.target].x, orbs[link.target].y);
+      drawConnection(source, target);
+    }
+  }
+
+  if (params.showGas) {
+    for (let orb of orbs.slice(params.numOrbs)) {
+      fill(255, 0, 0, 100);
+      ellipse(orb.x, orb.y, 2 * orb.r);
+    }
   }
 }
 
@@ -143,7 +218,7 @@ function ticked() {
 
 function mousePressed() {
   // Check if the mouse is over an orb
-  orbs.slice(0, numOrbs).forEach((orb) => {
+  orbs.slice(0, params.numOrbs).forEach((orb) => {
     let d = dist(mouseX, mouseY, orb.x, orb.y);
     if (d < NODE_RADIUS) {
       draggedOrb = orb;
@@ -158,18 +233,18 @@ function drawConnection(source, target) {
   const angleBetween = Math.atan2(target.y - source.y, target.x - source.x);
 
   const angle1 =
-    angleBetween + maxLinkSpreadSlider.value() * spreadSlider.value();
+    angleBetween + params.maxLinkSpread * params.spreadScalingFactor;
   const angle2 =
-    angleBetween - maxLinkSpreadSlider.value() * spreadSlider.value();
+    angleBetween - params.maxLinkSpread * params.spreadScalingFactor;
 
   const angle3 =
     angleBetween +
     PI -
-    (PI - maxLinkSpreadSlider.value()) * spreadSlider.value();
+    (PI - params.maxLinkSpread) * params.spreadScalingFactor;
   const angle4 =
     angleBetween -
     PI +
-    (PI - maxLinkSpreadSlider.value()) * spreadSlider.value();
+    (PI - params.maxLinkSpread) * params.spreadScalingFactor;
 
   const p1 = p5.Vector.add(source, p5.Vector.fromAngle(angle1, NODE_RADIUS));
   const p2 = p5.Vector.add(source, p5.Vector.fromAngle(angle2, NODE_RADIUS));
@@ -178,7 +253,7 @@ function drawConnection(source, target) {
   const p4 = p5.Vector.add(target, p5.Vector.fromAngle(angle4, NODE_RADIUS));
 
   const d2Base = Math.min(
-    handleSizeSlider.value() / 2,
+    params.handleSize / 2,
     (p5.Vector.dist(p1, p3) / 2) * NODE_RADIUS
   );
   const d2 = d2Base * Math.min(1, d / NODE_RADIUS);
