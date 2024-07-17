@@ -3,9 +3,10 @@
 /// <reference path="node_modules/@types/dat.gui/index.d.ts"/>
 
 let params = {
-  nodeRadius: undefined,
+  orbRadius: undefined,
   linkDistance: undefined,
   gasRadius: undefined,
+  numDustParticales: undefined,
   numOrbs: 5,
   chargeStrength: 0,
   gasDensity: 0.001,
@@ -14,7 +15,7 @@ let params = {
   handleSize: 2,
   temperature: 10,
   showLinks: true,
-  showNodes: true,
+  showOrbs: true,
   showGas: false,
 };
 
@@ -26,7 +27,7 @@ const colors = {
 
 const gui = new dat.GUI({ name: "NVLV Logo" });
 
-let orbs = [];
+let nodes = [];
 let simulation;
 let draggedOrb;
 
@@ -36,19 +37,33 @@ function initGui() {
     .add(params, "numOrbs", 1, 5, 1)
     .name("Orbs")
     .onChange(() => {
-      reinitNodes();
+      const currentOrbs = nodes.length - params.numDustParticales;
+      if (currentOrbs > params.numOrbs) {
+        nodes.splice(params.numOrbs, currentOrbs - params.numOrbs);
+      } else {
+        for (let i = currentOrbs; i < params.numOrbs; i++) {
+          nodes.unshift({
+            x: random(params.orbRadius * 1.1, width - params.orbRadius * 1.1),
+            y: random(params.orbRadius * 1.1, height - params.orbRadius * 1.1),
+            vx: 0,
+            vy: 0,
+            r: params.orbRadius,
+          });
+        }
+      }
+      simulation.nodes(nodes);
     });
   elementsFolder
-    .add(params, "nodeRadius", 1, 100, 1)
-    .name("Node Radius")
+    .add(params, "orbRadius", 1, 100, 1)
+    .name("Orb Radius")
     .onChange(() => {
-      orbs
+      nodes
         .slice(0, params.numOrbs)
-        .forEach((orb) => (orb.r = params.nodeRadius));
+        .forEach((orb) => (orb.r = params.orbRadius));
 
-      simulation.nodes(orbs);
+      simulation.nodes(nodes);
     });
-  elementsFolder.add(params, "showNodes").name("Show Nodes");
+  elementsFolder.add(params, "showOrbs").name("Show Orbs");
   elementsFolder.add(params, "showLinks").name("Show Links");
   elementsFolder.add(params, "showGas").name("Show Gas");
   elementsFolder.addColor(colors, "background").name("Background");
@@ -66,19 +81,23 @@ function initGui() {
     .add(params, "gasRadius", 1, 3 * params.gasRadius, 1)
     .name("Gas Radius")
     .onChange(() => {
-      orbs.slice(params.numOrbs).forEach((orb) => (orb.r = params.gasRadius));
-      simulation.nodes(orbs);
+      nodes.slice(params.numOrbs).forEach((orb) => (orb.r = params.gasRadius));
+      simulation.nodes(nodes);
     });
   physicsFolder
     .add(params, "gasDensity", 0.001, 0.01, 0.0001)
     .name("Gas Density")
     .onChange(() => {
-      const numDustParticales = params.gasDensity * width * height;
-      if (orbs.length - params.numOrbs > numDustParticales) {
-        orbs = orbs.slice(0, params.numOrbs + numDustParticales);
+      params.numDustParticales = params.gasDensity * width * height;
+      if (nodes.length - params.numOrbs > params.numDustParticales) {
+        nodes = nodes.slice(0, params.numOrbs + params.numDustParticales);
       } else {
-        for (let i = orbs.length - params.numOrbs; i < numDustParticales; i++) {
-          orbs.push({
+        for (
+          let i = nodes.length - params.numOrbs;
+          i < params.numDustParticales;
+          i++
+        ) {
+          nodes.push({
             x: random(params.gasRadius, width - params.gasRadius),
             y: random(params.gasRadius, height - params.gasRadius),
             vx: randomVelocity(params.temperature),
@@ -87,17 +106,17 @@ function initGui() {
           });
         }
       }
-      simulation.nodes(orbs);
+      simulation.nodes(nodes);
     });
   physicsFolder
     .add(params, "temperature", 0, 100, 1)
     .name("Temperature")
     .onChange(() => {
-      orbs.slice(params.numOrbs).forEach((orb) => {
+      nodes.slice(params.numOrbs).forEach((orb) => {
         orb.vx = randomVelocity(params.temperature);
         orb.vy = randomVelocity(params.temperature);
       });
-      simulation.nodes(orbs);
+      simulation.nodes(nodes);
     });
   physicsFolder.close();
 
@@ -112,9 +131,9 @@ function initGui() {
 
 function setup() {
   const dim = Math.min(windowWidth, windowHeight);
-  params.nodeRadius = dim / 4 / 2;
-  params.gasRadius = Math.max(1, Math.sqrt(params.nodeRadius) / 2);
-  params.linkDistance = params.nodeRadius * 2.5;
+  params.orbRadius = dim / 4 / 2;
+  params.gasRadius = Math.max(1, Math.sqrt(params.orbRadius) / 2);
+  params.linkDistance = params.orbRadius * 2.5;
   createCanvas();
 
   // Initialize orbs
@@ -123,7 +142,7 @@ function setup() {
 
   // Set up D3 simulation
   simulation = d3
-    .forceSimulation(orbs)
+    .forceSimulation(nodes)
     // .force("charge", d3.forceManyBody().strength(CHARGE_STRENGTH))
     .alphaDecay(0)
     .velocityDecay(0)
@@ -158,39 +177,21 @@ function setup() {
 }
 
 function initOrbs() {
-  orbs = initNodes().concat(initGas());
-}
-
-function reinitGas() {
-  orbs = orbs.slice(0, params.numOrbs).concat(initGas());
-  simulation.nodes(orbs);
-}
-
-function reinitNodes() {
-  orbs = initNodes().concat(orbs.slice(params.numOrbs));
-  simulation.nodes(orbs);
-}
-
-function initNodes() {
-  const nodes = [];
+  nodes = [];
 
   for (let i = 0; i < params.numOrbs; i++) {
     nodes.push({
-      x: random(params.nodeRadius * 1.1, width - params.nodeRadius * 1.1),
-      y: random(params.nodeRadius * 1.1, height - params.nodeRadius * 1.1),
+      x: random(params.orbRadius * 1.1, width - params.orbRadius * 1.1),
+      y: random(params.orbRadius * 1.1, height - params.orbRadius * 1.1),
       vx: 0,
       vy: 0,
-      r: params.nodeRadius,
+      r: params.orbRadius,
     });
   }
-  return nodes;
-}
 
-function initGas() {
-  const gas = [];
-  const numDustParticales = params.gasDensity * width * height;
-  for (let i = 0; i < numDustParticales; i++) {
-    gas.push({
+  params.numDustParticales = params.gasDensity * width * height;
+  for (let i = 0; i < params.numDustParticales; i++) {
+    nodes.push({
       x: random(params.gasRadius, width - params.gasRadius),
       y: random(params.gasRadius, height - params.gasRadius),
       vx: randomVelocity(params.temperature),
@@ -198,7 +199,6 @@ function initGas() {
       r: params.gasRadius,
     });
   }
-  return gas;
 }
 
 function draw() {
@@ -207,14 +207,14 @@ function draw() {
   strokeWeight(0);
 
   // Draw orbs based on D3's force simulation calculations
-  if (params.showNodes) {
-    for (let orb of orbs.slice(0, params.numOrbs)) {
+  if (params.showOrbs) {
+    for (let orb of nodes.slice(0, params.numOrbs)) {
       ellipse(orb.x, orb.y, 2 * orb.r);
     }
   }
 
   if (params.showGas) {
-    for (let orb of orbs.slice(params.numOrbs)) {
+    for (let orb of nodes.slice(params.numOrbs)) {
       fill(255, 0, 0, 100);
       ellipse(orb.x, orb.y, 2 * orb.r);
     }
@@ -223,8 +223,8 @@ function draw() {
   if (params.showLinks) {
     for (let i = 0; i < params.numOrbs; i++) {
       for (let j = i + 1; j < params.numOrbs; j++) {
-        const source = createVector(orbs[i].x, orbs[i].y);
-        const target = createVector(orbs[j].x, orbs[j].y);
+        const source = createVector(nodes[i].x, nodes[i].y);
+        const target = createVector(nodes[j].x, nodes[j].y);
         drawConnection(source, target);
       }
     }
@@ -237,9 +237,9 @@ function ticked() {
 
 function mousePressed() {
   // Check if the mouse is over an orb
-  orbs.slice(0, params.numOrbs).forEach((orb) => {
+  nodes.slice(0, params.numOrbs).forEach((orb) => {
     let d = dist(mouseX, mouseY, orb.x, orb.y);
-    if (d < params.nodeRadius) {
+    if (d < params.orbRadius) {
       draggedOrb = orb;
       return;
     }
@@ -249,9 +249,14 @@ function mousePressed() {
 function drawConnection(source, target) {
   const d = p5.Vector.dist(source, target);
 
+  strokeWeight(0);
+
   const thickness = Math.max(
     0,
-    Math.exp(-Math.pow(d / params.nodeRadius / 2, 2)) * params.nodeRadius
+    Math.sqrt(
+      Math.pow(params.orbRadius / 4, 2) -
+        Math.pow((d - 2 * params.orbRadius) / 5, 2)
+    )
   );
 
   stroke(colors.fill);
@@ -277,28 +282,28 @@ function drawConnection(source, target) {
 
   const p1 = p5.Vector.add(
     source,
-    p5.Vector.fromAngle(angle1, params.nodeRadius)
+    p5.Vector.fromAngle(angle1, params.orbRadius)
   );
   const p2 = p5.Vector.add(
     source,
-    p5.Vector.fromAngle(angle2, params.nodeRadius)
+    p5.Vector.fromAngle(angle2, params.orbRadius)
   );
 
   const p3 = p5.Vector.add(
     target,
-    p5.Vector.fromAngle(angle3, params.nodeRadius)
+    p5.Vector.fromAngle(angle3, params.orbRadius)
   );
   const p4 = p5.Vector.add(
     target,
-    p5.Vector.fromAngle(angle4, params.nodeRadius)
+    p5.Vector.fromAngle(angle4, params.orbRadius)
   );
 
   const d2Base = Math.min(
     params.handleSize / 2,
-    (p5.Vector.dist(p1, p3) / 2) * params.nodeRadius
+    (p5.Vector.dist(p1, p3) / 2) * params.orbRadius
   );
-  const d2 = d2Base * Math.min(1, d / params.nodeRadius);
-  const handle = d2 * params.nodeRadius;
+  const d2 = d2Base * Math.min(1, d / params.orbRadius);
+  const handle = d2 * params.orbRadius;
 
   const h1 = p5.Vector.add(p1, p5.Vector.fromAngle(angle1 - PI / 2, handle));
   const h2 = p5.Vector.add(p2, p5.Vector.fromAngle(angle2 + PI / 2, handle));
@@ -317,12 +322,12 @@ function mouseDragged() {
   // Allow the user to interact by dragging orbs
   if (draggedOrb) {
     draggedOrb.fx = Math.max(
-      params.nodeRadius,
-      Math.min(mouseX, width - params.nodeRadius)
+      params.orbRadius,
+      Math.min(mouseX, width - params.orbRadius)
     );
     draggedOrb.fy = Math.max(
-      params.nodeRadius,
-      Math.min(mouseY, height - params.nodeRadius)
+      params.orbRadius,
+      Math.min(mouseY, height - params.orbRadius)
     );
   }
 }
